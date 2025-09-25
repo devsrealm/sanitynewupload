@@ -15,7 +15,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        # The token is implicitly set to secrets.GITHUB_TOKEN
+        with:
+          ref: main
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
