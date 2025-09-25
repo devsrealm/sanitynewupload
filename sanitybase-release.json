@@ -1,5 +1,16 @@
 [
   {
+    "tag": "v2.0.53-sanitybase",
+    "published_at": "2025-09-25T03:58:55Z",
+    "download_urls": [
+      {
+        "name": "sanitybase.zip",
+        "url": "https://github.com/devsrealm/sanitynewupload/releases/download/v2.0.53-sanitybase/sanitybase.zip",
+        "size": 1987162
+      }
+    ]
+  },
+  {
     "tag": "v2.0.52-sanitybase",
     "published_at": "2025-09-25T03:49:55Z",
     "download_urls": [
