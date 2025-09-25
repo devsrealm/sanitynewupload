@@ -1,8 +1,11 @@
 name: Update Sanitybase Releases
-
 on:
   release:
     types: [published]
+
+# Add this permissions block
+permissions:
+  contents: write
 
 jobs:
   update-sanitybase-releases:
@@ -12,9 +15,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ref: main
+        # The token is implicitly set to secrets.GITHUB_TOKEN
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -22,13 +23,10 @@ jobs:
           node-version: '18'
       
       - name: Update sanitybase-release.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Create or update the sanitybase-release.json file
           node -e "
           const fs = require('fs');
-          const https = require('https');
           
           // Current release information
           const currentRelease = {
@@ -74,8 +72,6 @@ jobs:
           "
       
       - name: Commit and push changes
-        env:
-          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           git config --local user.email "devsrealmer@gmail.com"
           git config --local user.name "Olayemi F."
