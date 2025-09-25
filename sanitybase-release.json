@@ -1,5 +1,10 @@
 [
   {
+    "tag": "v2.0.52-sanitybase",
+    "published_at": "2025-09-25T03:49:55Z",
+    "download_urls": []
+  },
+  {
     "tag": "v2.0.47-sanitybase",
     "published_at": "2025-09-25T02:22:04Z",
     "download_urls": [
