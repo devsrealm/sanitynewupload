@@ -3,7 +3,6 @@ on:
   release:
     types: [published]
 
-# Add this permissions block
 permissions:
   contents: write
 
@@ -23,28 +22,79 @@ jobs:
         with:
           node-version: '18'
       
+      - name: Debug release information
+        run: |
+          echo "Release tag: ${{ github.event.release.tag_name }}"
+          echo "Published at: ${{ github.event.release.published_at }}"
+          echo "Assets count: ${{ github.event.release.assets_count }}"
+          echo "Assets JSON:"
+          echo '${{ toJSON(github.event.release.assets) }}' | jq '.'
+      
+      - name: Wait for assets (if needed)
+        run: |
+          # Sometimes assets take a moment to be available
+          if [ "${{ github.event.release.assets_count }}" -eq "0" ]; then
+            echo "No assets found initially, waiting 30 seconds..."
+            sleep 30
+          fi
+      
+      - name: Fetch latest release data via API
+        id: fetch_release
+        run: |
+          # Fetch the latest release data via GitHub API to ensure we have all assets
+          RELEASE_DATA=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.event.release.tag_name }}")
+          
+          echo "API Release data:"
+          echo "$RELEASE_DATA" | jq '.'
+          
+          # Save the release data to a file for the next step
+          echo "$RELEASE_DATA" > release_data.json
+      
       - name: Update sanitybase-release.json
         run: |
-          # Create or update the sanitybase-release.json file
           node -e "
           const fs = require('fs');
           
+          // Read the API release data
+          let releaseData;
+          try {
+            releaseData = JSON.parse(fs.readFileSync('release_data.json', 'utf8'));
+          } catch (error) {
+            console.log('Failed to read API data, falling back to workflow data');
+            releaseData = {
+              tag_name: '${{ github.event.release.tag_name }}',
+              published_at: '${{ github.event.release.published_at }}',
+              assets: JSON.parse(\`${{ toJSON(github.event.release.assets) }}\`)
+            };
+          }
+          
+          console.log('Processing release:', releaseData.tag_name);
+          console.log('Assets found:', releaseData.assets ? releaseData.assets.length : 0);
+          
           // Current release information
           const currentRelease = {
-            tag: '${{ github.event.release.tag_name }}',
-            published_at: '${{ github.event.release.published_at }}',
+            tag: releaseData.tag_name,
+            published_at: releaseData.published_at,
             download_urls: []
           };
           
           // Extract download URLs from assets
-          const assets = JSON.parse(\`${{ toJSON(github.event.release.assets) }}\`);
-          assets.forEach(asset => {
-            currentRelease.download_urls.push({
-              name: asset.name,
-              url: asset.browser_download_url,
-              size: asset.size
+          if (releaseData.assets && Array.isArray(releaseData.assets)) {
+            releaseData.assets.forEach(asset => {
+              console.log('Processing asset:', asset.name);
+              currentRelease.download_urls.push({
+                name: asset.name,
+                url: asset.browser_download_url,
+                size: asset.size
+              });
             });
-          });
+          } else {
+            console.log('No assets array found or assets is not an array');
+            console.log('Assets data:', releaseData.assets);
+          }
+          
+          console.log('Final download URLs:', currentRelease.download_urls);
           
           // Read existing file or create empty array
           let releases = [];
@@ -52,25 +102,45 @@ jobs:
             try {
               const data = fs.readFileSync('sanitybase-release.json', 'utf8');
               releases = JSON.parse(data);
+              console.log('Loaded existing releases:', releases.length);
             } catch (error) {
-              console.log('Creating new sanitybase-release.json file');
+              console.log('Error reading existing file, creating new:', error.message);
               releases = [];
             }
+          } else {
+            console.log('Creating new sanitybase-release.json file');
           }
           
           // Remove existing entry with same tag if exists
+          const originalLength = releases.length;
           releases = releases.filter(release => release.tag !== currentRelease.tag);
+          if (releases.length < originalLength) {
+            console.log('Removed existing entry for tag:', currentRelease.tag);
+          }
           
           // Add current release to the beginning
           releases.unshift(currentRelease);
+          console.log('Added new release, total releases:', releases.length);
           
           // Keep only the latest 5 releases
           releases = releases.slice(0, 5);
           
           // Write updated file
           fs.writeFileSync('sanitybase-release.json', JSON.stringify(releases, null, 2));
-          console.log('Updated sanitybase-release.json with', releases.length, 'releases');
+          console.log('Successfully updated sanitybase-release.json');
+          console.log('Final file content:');
+          console.log(JSON.stringify(releases, null, 2));
           "
+      
+      - name: Verify file was updated
+        run: |
+          if [ -f "sanitybase-release.json" ]; then
+            echo "File exists, content:"
+            cat sanitybase-release.json
+          else
+            echo "ERROR: sanitybase-release.json was not created!"
+            exit 1
+          fi
       
       - name: Commit and push changes
         run: |
