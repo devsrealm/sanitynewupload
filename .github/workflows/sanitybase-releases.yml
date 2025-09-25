@@ -1,7 +1,7 @@
 name: Update Sanitybase Releases
 on:
   release:
-    types: [published]
+    types: [published, edited]
 
 # Add this permissions block
 permissions:
