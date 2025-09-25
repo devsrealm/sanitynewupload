@@ -1,0 +1,85 @@
+name: Update Sanitybase Releases
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-sanitybase-releases:
+    runs-on: ubuntu-latest
+    if: endsWith(github.event.release.tag_name, 'sanitybase')
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Update sanitybase-release.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create or update the sanitybase-release.json file
+          node -e "
+          const fs = require('fs');
+          const https = require('https');
+          
+          // Current release information
+          const currentRelease = {
+            tag: '${{ github.event.release.tag_name }}',
+            published_at: '${{ github.event.release.published_at }}',
+            download_urls: []
+          };
+          
+          // Extract download URLs from assets
+          const assets = JSON.parse(\`${{ toJSON(github.event.release.assets) }}\`);
+          assets.forEach(asset => {
+            currentRelease.download_urls.push({
+              name: asset.name,
+              url: asset.browser_download_url,
+              size: asset.size
+            });
+          });
+          
+          // Read existing file or create empty array
+          let releases = [];
+          if (fs.existsSync('sanitybase-release.json')) {
+            try {
+              const data = fs.readFileSync('sanitybase-release.json', 'utf8');
+              releases = JSON.parse(data);
+            } catch (error) {
+              console.log('Creating new sanitybase-release.json file');
+              releases = [];
+            }
+          }
+          
+          // Remove existing entry with same tag if exists
+          releases = releases.filter(release => release.tag !== currentRelease.tag);
+          
+          // Add current release to the beginning
+          releases.unshift(currentRelease);
+          
+          // Keep only the latest 5 releases
+          releases = releases.slice(0, 5);
+          
+          // Write updated file
+          fs.writeFileSync('sanitybase-release.json', JSON.stringify(releases, null, 2));
+          console.log('Updated sanitybase-release.json with', releases.length, 'releases');
+          "
+      
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add sanitybase-release.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update sanitybase-release.json with release ${{ github.event.release.tag_name }}"
+            git push
+          fi
