@@ -1,5 +1,16 @@
 [
   {
+    "tag": "v2.0.60-sanitybase",
+    "published_at": "2025-10-15T07:07:14Z",
+    "download_urls": [
+      {
+        "name": "sanitybase.zip",
+        "url": "https://github.com/devsrealm/sanitynewupload/releases/download/v2.0.60-sanitybase/sanitybase.zip",
+        "size": 2005117
+      }
+    ]
+  },
+  {
     "tag": "v2.0.59-sanitybase",
     "published_at": "2025-10-15T07:03:42Z",
     "download_urls": [
@@ -40,17 +51,6 @@
         "name": "sanitybase.zip",
         "url": "https://github.com/devsrealm/sanitynewupload/releases/download/v2.0.56-sanitybase/sanitybase.zip",
         "size": 1988083
-      }
-    ]
-  },
-  {
-    "tag": "v2.0.55-sanitybase",
-    "published_at": "2025-09-26T03:57:04Z",
-    "download_urls": [
-      {
-        "name": "sanitybase.zip",
-        "url": "https://github.com/devsrealm/sanitynewupload/releases/download/v2.0.55-sanitybase/sanitybase.zip",
-        "size": 1987955
       }
     ]
   }
