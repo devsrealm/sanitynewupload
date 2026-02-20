@@ -10,18 +10,18 @@ jobs:
   update-sanitybase-releases:
     runs-on: ubuntu-latest
     if: contains(github.event.release.tag_name, 'sanitybase')
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: main
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-      
+
       - name: Debug release information
         run: |
           echo "Release tag: ${{ github.event.release.tag_name }}"
@@ -29,7 +29,7 @@ jobs:
           echo "Assets count: ${{ github.event.release.assets_count }}"
           echo "Assets JSON:"
           echo '${{ toJSON(github.event.release.assets) }}' | jq '.'
-      
+
       - name: Wait for assets (if needed)
         run: |
           # Sometimes assets take a moment to be available
@@ -37,20 +37,20 @@ jobs:
             echo "No assets found initially, waiting 30 seconds..."
             sleep 30
           fi
-      
+
       - name: Fetch latest release data via API
         id: fetch_release
         run: |
           # Fetch the latest release data via GitHub API to ensure we have all assets
           RELEASE_DATA=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.event.release.tag_name }}")
-          
+
           echo "API Release data:"
           echo "$RELEASE_DATA" | jq '.'
-          
+
           # Save the release data to a file for the next step
           echo "$RELEASE_DATA" > release_data.json
-      
+
       - name: Extract branch name from tag
         id: extract_branch
         run: |
@@ -66,24 +66,32 @@ jobs:
             echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
             echo "branch_name_file=$BRANCH_NAME_FILE" >> $GITHUB_OUTPUT
             echo "Extracted branch: $BRANCH_NAME (file: $BRANCH_NAME_FILE)"
+            echo "is_old_format=false" >> $GITHUB_OUTPUT
+          elif [[ $TAG =~ -sanitybase$ ]]; then
+            # Old format without branch name - assume it's from main
+            echo "Old tag format detected (no branch name), using 'main' as default"
+            echo "branch_name=main" >> $GITHUB_OUTPUT
+            echo "branch_name_file=main" >> $GITHUB_OUTPUT
+            echo "is_old_format=true" >> $GITHUB_OUTPUT
           else
             echo "Could not extract branch name from tag, using 'main' as default"
             echo "branch_name=main" >> $GITHUB_OUTPUT
             echo "branch_name_file=main" >> $GITHUB_OUTPUT
+            echo "is_old_format=false" >> $GITHUB_OUTPUT
           fi
-      
+
       - name: Update sanitybase-release.json for branch
         run: |
           node -e "
           const fs = require('fs');
-          
+
           const branchName = '${{ steps.extract_branch.outputs.branch_name }}';
           const branchNameFile = '${{ steps.extract_branch.outputs.branch_name_file }}';
           const fileName = \`sanitybase-release-\${branchNameFile}.json\`;
-          
+
           console.log('Processing release for branch:', branchName);
           console.log('Output file:', fileName);
-          
+
           // Read the API release data
           let releaseData;
           try {
@@ -96,10 +104,10 @@ jobs:
               assets: JSON.parse(\`${{ toJSON(github.event.release.assets) }}\`)
             };
           }
-          
+
           console.log('Processing release:', releaseData.tag_name);
           console.log('Assets found:', releaseData.assets ? releaseData.assets.length : 0);
-          
+
           // Current release information
           const currentRelease = {
             tag: releaseData.tag_name,
@@ -107,7 +115,7 @@ jobs:
             published_at: releaseData.published_at,
             download_urls: []
           };
-          
+
           // Extract download URLs from assets
           if (releaseData.assets && Array.isArray(releaseData.assets)) {
             releaseData.assets.forEach(asset => {
@@ -122,9 +130,9 @@ jobs:
             console.log('No assets array found or assets is not an array');
             console.log('Assets data:', releaseData.assets);
           }
-          
+
           console.log('Final download URLs:', currentRelease.download_urls);
-          
+
           // Read existing file or create empty array
           let releases = [];
           if (fs.existsSync(fileName)) {
@@ -139,28 +147,28 @@ jobs:
           } else {
             console.log('Creating new file:', fileName);
           }
-          
+
           // Remove existing entry with same tag if exists
           const originalLength = releases.length;
           releases = releases.filter(release => release.tag !== currentRelease.tag);
           if (releases.length < originalLength) {
             console.log('Removed existing entry for tag:', currentRelease.tag);
           }
-          
+
           // Add current release to the beginning
           releases.unshift(currentRelease);
           console.log('Added new release, total releases:', releases.length);
-          
+
           // Keep only the latest 5 releases
           releases = releases.slice(0, 5);
-          
+
           // Write updated file
           fs.writeFileSync(fileName, JSON.stringify(releases, null, 2));
           console.log('Successfully updated', fileName);
           console.log('Final file content:');
           console.log(JSON.stringify(releases, null, 2));
           "
-      
+
       - name: Update combined sanitybase-release.json (all branches)
         run: |
           node -e "
@@ -168,9 +176,11 @@ jobs:
           
           const branchName = '${{ steps.extract_branch.outputs.branch_name }}';
           const branchNameFile = '${{ steps.extract_branch.outputs.branch_name_file }}';
+          const isOldFormat = '${{ steps.extract_branch.outputs.is_old_format }}' === 'true';
           const combinedFileName = 'sanitybase-release.json';
           
           console.log('Updating combined file for all branches');
+          console.log('Branch:', branchName, '| Old format:', isOldFormat);
           
           // Read the API release data
           let releaseData;
@@ -202,11 +212,35 @@ jobs:
           
           // Read existing combined file or create empty structure
           let releasesData = {};
+          let needsMigration = false;
+          
           if (fs.existsSync(combinedFileName)) {
             try {
               const data = fs.readFileSync(combinedFileName, 'utf8');
-              releasesData = JSON.parse(data);
-              console.log('Loaded existing combined file');
+              const existingData = JSON.parse(data);
+              
+              // Check if file is in old format (array) or new format (object with branches)
+              if (Array.isArray(existingData)) {
+                console.log('*** OLD FORMAT DETECTED - MIGRATING ***');
+                console.log('Found', existingData.length, 'old releases to migrate');
+                needsMigration = true;
+                
+                // Migrate old array format to new object format
+                // Old releases without branch info go to 'main'
+                releasesData['main'] = existingData.map(release => {
+                  // Add branch field if it doesn't exist
+                  if (!release.branch) {
+                    release.branch = 'main';
+                  }
+                  return release;
+                });
+                
+                console.log('Migrated', releasesData['main'].length, 'releases to main branch');
+              } else {
+                // Already in new format
+                releasesData = existingData;
+                console.log('Loaded existing combined file (new format)');
+              }
             } catch (error) {
               console.log('Error reading existing file, creating new:', error.message);
               releasesData = {};
@@ -232,17 +266,21 @@ jobs:
           
           // Write updated combined file
           fs.writeFileSync(combinedFileName, JSON.stringify(releasesData, null, 2));
+          
+          if (needsMigration) {
+            console.log('*** MIGRATION COMPLETED ***');
+          }
           console.log('Successfully updated', combinedFileName);
           console.log('Total branches:', Object.keys(releasesData).length);
           Object.keys(releasesData).forEach(branch => {
             console.log(\`  \${branch}: \${releasesData[branch].length} releases\`);
           });
           "
-      
+
       - name: Verify files were updated
         run: |
           BRANCH_FILE="sanitybase-release-${{ steps.extract_branch.outputs.branch_name_file }}.json"
-          
+
           echo "=== Branch-specific file: $BRANCH_FILE ==="
           if [ -f "$BRANCH_FILE" ]; then
             echo "File exists, content:"
@@ -251,7 +289,7 @@ jobs:
             echo "ERROR: $BRANCH_FILE was not created!"
             exit 1
           fi
-          
+
           echo ""
           echo "=== Combined file: sanitybase-release.json ==="
           if [ -f "sanitybase-release.json" ]; then
@@ -261,7 +299,7 @@ jobs:
             echo "ERROR: sanitybase-release.json was not created!"
             exit 1
           fi
-      
+
       - name: Commit and push changes
         run: |
           git config --local user.email "devsrealmer@gmail.com"
