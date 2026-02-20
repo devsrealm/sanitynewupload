@@ -1,0 +1,14 @@
+[
+  {
+    "tag": "v2.0.140-sanitybase-release-docker",
+    "branch": "release-docker",
+    "published_at": "2026-02-20T11:02:28Z",
+    "download_urls": [
+      {
+        "name": "sanitybase.zip",
+        "url": "https://github.com/devsrealm/sanitynewupload/releases/download/v2.0.140-sanitybase-release-docker/sanitybase.zip",
+        "size": 2538552
+      }
+    ]
+  }
+]
