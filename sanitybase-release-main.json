@@ -1,5 +1,17 @@
 [
   {
+    "tag": "v2.0.142-sanitybase-main",
+    "branch": "main",
+    "published_at": "2026-02-20T23:02:54Z",
+    "download_urls": [
+      {
+        "name": "sanitybase.zip",
+        "url": "https://github.com/devsrealm/sanitynewupload/releases/download/v2.0.142-sanitybase-main/sanitybase.zip",
+        "size": 2537896
+      }
+    ]
+  },
+  {
     "tag": "v2.0.141-sanitybase-main",
     "branch": "main",
     "published_at": "2026-02-20T14:15:55Z",
