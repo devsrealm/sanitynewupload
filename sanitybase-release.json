@@ -1,6 +1,18 @@
 {
   "main": [
     {
+      "tag": "v2.0.145-sanitybase-main",
+      "branch": "main",
+      "published_at": "2026-02-21T07:42:53Z",
+      "download_urls": [
+        {
+          "name": "sanitybase.zip",
+          "url": "https://github.com/devsrealm/sanitynewupload/releases/download/v2.0.145-sanitybase-main/sanitybase.zip",
+          "size": 2615970
+        }
+      ]
+    },
+    {
       "tag": "v2.0.144-sanitybase-main",
       "branch": "main",
       "published_at": "2026-02-21T00:01:50Z",
@@ -47,18 +59,6 @@
           "size": 2540415
         }
       ]
-    },
-    {
-      "tag": "v2.0.137-sanitybase",
-      "published_at": "2026-02-20T06:06:19Z",
-      "download_urls": [
-        {
-          "name": "sanitybase.zip",
-          "url": "https://github.com/devsrealm/sanitynewupload/releases/download/v2.0.137-sanitybase/sanitybase.zip",
-          "size": 2538355
-        }
-      ],
-      "branch": "main"
     }
   ],
   "release-docker": [
